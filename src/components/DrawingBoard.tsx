@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 const COLORS = [
@@ -27,6 +28,7 @@ export default function DrawingBoard() {
   const [color, setColor] = useState<string>(COLORS[0].value);
   const [lineWidth, setLineWidth] = useState<number>(THICKNESSES[1].value);
   const [tool, setTool] = useState<"draw" | "erase">("draw");
+  const [showCourt, setShowCourt] = useState<boolean>(true);
 
   // Keep latest color/lineWidth/tool available inside event handlers without re-binding them.
   const colorRef = useRef(color);
@@ -218,28 +220,56 @@ export default function DrawingBoard() {
 
           <div className="h-px w-full bg-zinc-200" />
 
-          <button
-            type="button"
-            aria-label="Clear canvas"
-            onClick={handleClear}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white active:scale-95"
-          >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              aria-label="Clear canvas"
+              onClick={handleClear}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              aria-label="Toggle court background"
+              aria-pressed={showCourt}
+              onClick={() => setShowCourt((v) => !v)}
+              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors active:scale-95 ${
+                showCourt ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-700"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <rect x="4" y="3" width="16" height="18" rx="1" strokeLinejoin="round" />
+                <path d="M4 9h16M4 15h16M12 3v18" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
       <div className="flex flex-1 items-start justify-center overflow-hidden">
         <div
-          className="overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
+          className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
           style={{ width: "95%", height: "92%" }}
         >
-          <div ref={containerRef} className="h-full w-full touch-none">
+          {showCourt && (
+            <Image
+              src="/court/court.webp"
+              alt=""
+              fill
+              priority
+              draggable={false}
+              className="pointer-events-none select-none object-cover"
+              style={{ transform: "scale(1.15) translate(-5%, 4%)" }}
+            />
+          )}
+          <div ref={containerRef} className="relative z-10 h-full w-full touch-none">
             <canvas
               ref={canvasRef}
-              className="block h-full w-full touch-none bg-white"
+              className="block h-full w-full touch-none"
               onPointerDown={handlePointerDown}
               onPointerMove={handlePointerMove}
               onPointerUp={endStroke}
