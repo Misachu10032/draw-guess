@@ -16,6 +16,12 @@ const THICKNESSES = [
   { name: "Extra thick", value: 28 },
 ] as const;
 
+// Kept in one place so the exported PNG's compositing math always matches the
+// CSS transform applied to the on-screen court image.
+const COURT_SCALE = 1.15;
+const COURT_TRANSLATE_X_PCT = -5;
+const COURT_TRANSLATE_Y_PCT = 4;
+
 type Point = { x: number; y: number };
 
 export default function DrawingBoard() {
@@ -24,6 +30,7 @@ export default function DrawingBoard() {
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
   const lastPointRef = useRef<Point | null>(null);
   const drawingPointerIdRef = useRef<number | null>(null);
+  const courtImgRef = useRef<HTMLImageElement | null>(null);
 
   const [color, setColor] = useState<string>(COLORS[0].value);
   const [lineWidth, setLineWidth] = useState<number>(THICKNESSES[1].value);
@@ -150,6 +157,57 @@ export default function DrawingBoard() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
   };
 
+  const handleSave = () => {
+    const canvas = canvasRef.current;
+    if (!canvas || canvas.width === 0 || canvas.height === 0) return;
+
+    const exportCanvas = document.createElement("canvas");
+    exportCanvas.width = canvas.width;
+    exportCanvas.height = canvas.height;
+    const exportCtx = exportCanvas.getContext("2d");
+    if (!exportCtx) return;
+
+    const w = canvas.width;
+    const h = canvas.height;
+    exportCtx.fillStyle = "#ffffff";
+    exportCtx.fillRect(0, 0, w, h);
+
+    const courtImg = courtImgRef.current;
+    if (showCourt && courtImg && courtImg.complete && courtImg.naturalWidth > 0) {
+      // Replicate the CSS object-fit: cover + transform applied to the on-screen
+      // court image, so the exported PNG matches what's actually visible.
+      const coverScale = Math.max(w / courtImg.naturalWidth, h / courtImg.naturalHeight);
+      const baseW = courtImg.naturalWidth * coverScale;
+      const baseH = courtImg.naturalHeight * coverScale;
+      const baseX = (w - baseW) / 2;
+      const baseY = (h - baseH) / 2;
+
+      const cx = w / 2;
+      const cy = h / 2;
+      const tx = (COURT_TRANSLATE_X_PCT / 100) * w;
+      const ty = (COURT_TRANSLATE_Y_PCT / 100) * h;
+
+      const destW = baseW * COURT_SCALE;
+      const destH = baseH * COURT_SCALE;
+      const destX = cx + COURT_SCALE * (baseX - cx + tx);
+      const destY = cy + COURT_SCALE * (baseY - cy + ty);
+
+      exportCtx.drawImage(courtImg, destX, destY, destW, destH);
+    }
+
+    exportCtx.drawImage(canvas, 0, 0);
+
+    exportCanvas.toBlob((blob) => {
+      if (!blob) return;
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `drawing-${Date.now()}.png`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }, "image/png");
+  };
+
   return (
     <div className="flex h-full w-full flex-col bg-zinc-50">
       <div
@@ -246,6 +304,18 @@ export default function DrawingBoard() {
                 <path d="M4 9h16M4 15h16M12 3v18" strokeLinecap="round" />
               </svg>
             </button>
+
+            <button
+              type="button"
+              aria-label="Save drawing"
+              onClick={handleSave}
+              className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-zinc-300 bg-white text-zinc-700 transition-colors active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M12 4v11m0 0l-4-4m4 4l4-4" strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M5 19h14" strokeLinecap="round" />
+              </svg>
+            </button>
           </div>
         </div>
       </div>
@@ -257,13 +327,14 @@ export default function DrawingBoard() {
         >
           {showCourt && (
             <Image
+              ref={courtImgRef}
               src="/court/court.webp"
               alt=""
               fill
               priority
               draggable={false}
               className="pointer-events-none select-none object-cover"
-              style={{ transform: "scale(1.15) translate(-5%, 4%)" }}
+              style={{ transform: `scale(${COURT_SCALE}) translate(${COURT_TRANSLATE_X_PCT}%, ${COURT_TRANSLATE_Y_PCT}%)` }}
             />
           )}
           <div ref={containerRef} className="relative z-10 h-full w-full touch-none">
