@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { PLAYERS } from "@/lib/players";
 import RoundGuess from "@/components/RoundGuess";
 import RoundReveal from "@/components/RoundReveal";
@@ -16,9 +16,9 @@ export default function PlayGame() {
   const [phase, setPhase] = useState<Phase>("guess");
   const [guessInput, setGuessInput] = useState("");
   const [finished, setFinished] = useState(false);
-  // Guesses aren't displayed anywhere yet (results screen is a later phase), so
-  // this is a ref rather than state — recorded for later without forcing re-renders.
-  const guessesRef = useRef<string[]>([]);
+  // Displayed on the "我的画" review button, so it must be state (not a ref)
+  // to actually re-render the panel when a guess is confirmed.
+  const [guesses, setGuesses] = useState<string[]>([]);
 
   const player = PLAYERS[roundIndex];
   const isLastRound = roundIndex === TOTAL_ROUNDS - 1;
@@ -29,7 +29,11 @@ export default function PlayGame() {
   const unlockedCount = finished ? TOTAL_ROUNDS : phase === "reveal" ? roundIndex + 1 : roundIndex;
 
   const handleConfirm = () => {
-    guessesRef.current[roundIndex] = guessInput;
+    setGuesses((prev) => {
+      const next = [...prev];
+      next[roundIndex] = guessInput.trim();
+      return next;
+    });
     setPhase("reveal");
   };
 
@@ -46,7 +50,7 @@ export default function PlayGame() {
   return (
     <div className="flex h-full w-full flex-col bg-zinc-50">
       <div className="flex-none px-3 pb-1.5" style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}>
-        <RoundReviewPanel entries={PLAYERS} unlockedCount={unlockedCount} />
+        <RoundReviewPanel entries={PLAYERS} guesses={guesses} unlockedCount={unlockedCount} />
         <p className="mt-1.5 text-center text-xs font-medium text-zinc-400">
           {finished ? "已完成" : `第 ${roundIndex + 1} / ${TOTAL_ROUNDS} 轮`}
         </p>
