@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { sanitizeRoomCode } from "@/lib/room";
+import ExampleModal from "@/components/ExampleModal";
 
 export default function LandingPage() {
   const router = useRouter();
@@ -60,6 +61,8 @@ export default function LandingPage() {
           </button>
         </div>
       </div>
+
+      <ExampleModal />
     </div>
   );
 }
