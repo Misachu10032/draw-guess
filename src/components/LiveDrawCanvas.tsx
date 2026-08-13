@@ -34,9 +34,12 @@ type LiveDrawCanvasProps = {
   onSegment: (segment: StrokeSegment) => void;
   /** Called when the drawer clears the canvas, so the viewer can clear too. */
   onClear: () => void;
+  /** Called when the drawer toggles the court background, so the viewer's
+   *  copy stays in sync. */
+  onCourtToggle?: (visible: boolean) => void;
 };
 
-export default function LiveDrawCanvas({ onSegment, onClear }: LiveDrawCanvasProps) {
+export default function LiveDrawCanvas({ onSegment, onClear, onCourtToggle }: LiveDrawCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -303,7 +306,13 @@ export default function LiveDrawCanvas({ onSegment, onClear }: LiveDrawCanvasPro
               type="button"
               aria-label="Toggle court background"
               aria-pressed={showCourt}
-              onClick={() => setShowCourt((v) => !v)}
+              onClick={() =>
+                setShowCourt((v) => {
+                  const next = !v;
+                  onCourtToggle?.(next);
+                  return next;
+                })
+              }
               className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors active:scale-95 ${
                 showCourt ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-700"
               }`}

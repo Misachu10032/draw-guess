@@ -1,17 +1,25 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef } from "react";
 import type { StrokeSegment } from "@/lib/room";
+
+// Kept in one place so it always matches DrawingBoard.tsx's court image styling.
+const COURT_SCALE = 1.15;
+const COURT_TRANSLATE_X_PCT = -5;
+const COURT_TRANSLATE_Y_PCT = 4;
 
 type LiveDrawViewerProps = {
   /** Accumulated segments for the current round, in receive order. */
   segments: StrokeSegment[];
+  /** Mirrors the drawer's court-background toggle. */
+  showCourt?: boolean;
 };
 
 // Read-only canvas that replays received stroke segments. Points and widths
 // are normalized (0..1 of the drawer's CSS size) by LiveDrawCanvas, so they
 // render correctly here regardless of this device's screen size.
-export default function LiveDrawViewer({ segments }: LiveDrawViewerProps) {
+export default function LiveDrawViewer({ segments, showCourt = false }: LiveDrawViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -92,8 +100,21 @@ export default function LiveDrawViewer({ segments }: LiveDrawViewerProps) {
   }, [segments, redraw]);
 
   return (
-    <div ref={containerRef} className="h-full w-full">
-      <canvas ref={canvasRef} className="block h-full w-full" />
+    <div className="relative h-full w-full">
+      {showCourt && (
+        <Image
+          src="/court/court.webp"
+          alt=""
+          fill
+          priority
+          draggable={false}
+          className="pointer-events-none select-none object-cover"
+          style={{ transform: `scale(${COURT_SCALE}) translate(${COURT_TRANSLATE_X_PCT}%, ${COURT_TRANSLATE_Y_PCT}%)` }}
+        />
+      )}
+      <div ref={containerRef} className="relative z-10 h-full w-full">
+        <canvas ref={canvasRef} className="block h-full w-full" />
+      </div>
     </div>
   );
 }

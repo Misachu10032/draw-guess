@@ -22,6 +22,7 @@ export type ChatMessage = {
 export type RoomEvent =
   | { type: "stroke-batch"; roundIndex: number; segment: StrokeSegment }
   | { type: "clear-canvas"; roundIndex: number }
+  | { type: "court-toggle"; visible: boolean }
   | { type: "chat-message"; message: ChatMessage }
   | { type: "round-advance"; roundIndex: number };
 

@@ -41,6 +41,9 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [guessDraft, setGuessDraft] = useState("");
   const [viewMode, setViewMode] = useState<"drawing" | "photo">("drawing");
+  // Mirrors the drawer's court toggle for the guesser's view — defaults to
+  // true each round, matching LiveDrawCanvas's own per-round default.
+  const [courtVisible, setCourtVisible] = useState(true);
 
   const channelRef = useRef<PresenceChannel | null>(null);
 
@@ -99,6 +102,8 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
           next[event.roundIndex] = [];
           return next;
         });
+      } else if (event.type === "court-toggle") {
+        setCourtVisible(event.visible);
       } else if (event.type === "chat-message") {
         setChatMessages((prev) => [...prev, event.message]);
       } else if (event.type === "round-advance") {
@@ -107,6 +112,7 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
         setChatMessages([]);
         setGuessDraft("");
         setViewMode("drawing");
+        setCourtVisible(true);
       }
     });
 
@@ -211,12 +217,14 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
             isLastRound={isLastRound}
             onSegment={(segment) => sendRoomEvent({ type: "stroke-batch", roundIndex, segment })}
             onClear={() => sendRoomEvent({ type: "clear-canvas", roundIndex })}
+            onCourtToggle={(visible) => sendRoomEvent({ type: "court-toggle", visible })}
             onAdvance={handleAdvance}
           />
         ) : (
           <GuesserView
             player={player}
             strokes={roundStrokes[roundIndex] ?? []}
+            showCourt={courtVisible}
             chatMessages={chatMessages}
             myUserId={userId}
             hasGuessed={hasGuessedThisRound}
@@ -287,6 +295,7 @@ function DrawerView({
   isLastRound,
   onSegment,
   onClear,
+  onCourtToggle,
   onAdvance,
 }: {
   player: (typeof PLAYERS)[number];
@@ -294,6 +303,7 @@ function DrawerView({
   isLastRound: boolean;
   onSegment: (segment: StrokeSegment) => void;
   onClear: () => void;
+  onCourtToggle: (visible: boolean) => void;
   onAdvance: () => void;
 }) {
   const [showPhoto, setShowPhoto] = useState(false);
@@ -301,7 +311,7 @@ function DrawerView({
   return (
     <div className="relative flex h-full w-full flex-col">
       <div className="min-h-0 flex-1">
-        <LiveDrawCanvas onSegment={onSegment} onClear={onClear} />
+        <LiveDrawCanvas onSegment={onSegment} onClear={onClear} onCourtToggle={onCourtToggle} />
       </div>
 
       <button
@@ -371,6 +381,7 @@ function DrawerView({
 function GuesserView({
   player,
   strokes,
+  showCourt,
   chatMessages,
   myUserId,
   hasGuessed,
@@ -382,6 +393,7 @@ function GuesserView({
 }: {
   player: (typeof PLAYERS)[number];
   strokes: StrokeSegment[];
+  showCourt: boolean;
   chatMessages: ChatMessage[];
   myUserId: string;
   hasGuessed: boolean;
@@ -430,7 +442,7 @@ function GuesserView({
           {viewMode === "photo" && hasGuessed ? (
             <Image src={player.photoSrc} alt="" fill className="object-contain" />
           ) : (
-            <LiveDrawViewer segments={strokes} />
+            <LiveDrawViewer segments={strokes} showCourt={showCourt} />
           )}
         </div>
       </div>

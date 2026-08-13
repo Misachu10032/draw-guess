@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { getPusherServer } from "@/lib/pusher-server";
 import { ROOM_EVENT_NAME, roomChannelName, sanitizeRoomCode, type RoomEvent } from "@/lib/room";
 
-const VALID_EVENT_TYPES = new Set(["stroke-batch", "clear-canvas", "chat-message", "round-advance"]);
+const VALID_EVENT_TYPES = new Set([
+  "stroke-batch",
+  "clear-canvas",
+  "court-toggle",
+  "chat-message",
+  "round-advance",
+]);
 
 function isRoomEvent(value: unknown): value is RoomEvent {
   return (
