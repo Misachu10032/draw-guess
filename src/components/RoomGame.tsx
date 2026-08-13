@@ -41,15 +41,8 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [guessDraft, setGuessDraft] = useState("");
   const [viewMode, setViewMode] = useState<"drawing" | "photo">("drawing");
-  // The guesser's last message each round, for the review panel — captured
-  // from chatMessagesRef right before round-advance resets it.
-  const [guesses, setGuesses] = useState<(string | null)[]>([]);
 
   const channelRef = useRef<PresenceChannel | null>(null);
-  const chatMessagesRef = useRef<ChatMessage[]>(chatMessages);
-  useEffect(() => {
-    chatMessagesRef.current = chatMessages;
-  }, [chatMessages]);
 
   useEffect(() => {
     let pusher: PusherType | null = null;
@@ -109,15 +102,6 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
       } else if (event.type === "chat-message") {
         setChatMessages((prev) => [...prev, event.message]);
       } else if (event.type === "round-advance") {
-        const completedRoundIndex = event.roundIndex - 1;
-        const lastMessage = chatMessagesRef.current[chatMessagesRef.current.length - 1];
-        if (completedRoundIndex >= 0) {
-          setGuesses((prev) => {
-            const next = [...prev];
-            next[completedRoundIndex] = lastMessage ? lastMessage.text : null;
-            return next;
-          });
-        }
         setRoundIndex(event.roundIndex);
         setFinished(event.roundIndex >= TOTAL_ROUNDS);
         setChatMessages([]);
@@ -148,9 +132,9 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
   const player = PLAYERS[Math.min(roundIndex, TOTAL_ROUNDS - 1)];
   const isLastRound = roundIndex === TOTAL_ROUNDS - 1;
   const hasGuessedThisRound = chatMessages.some((m) => m.senderId === userId);
-  // Every past round is resolved; the current round unlocks once I personally
-  // know the answer — immediately if I'm drawing it, or once I've guessed.
-  const unlockedCount = finished ? TOTAL_ROUNDS : roundIndex + (amIDrawer || hasGuessedThisRound ? 1 : 0);
+  // A round only shows up in the review panel once it's fully over, for both
+  // players alike — not as soon as you personally know the answer.
+  const unlockedCount = finished ? TOTAL_ROUNDS : roundIndex;
 
   const handleAdvance = () => {
     sendRoomEvent({ type: "round-advance", roundIndex: roundIndex + 1 });
@@ -191,12 +175,7 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
         }}
       >
         <p className="text-2xl font-bold text-zinc-900">你们完成了全部 {TOTAL_ROUNDS} 轮！</p>
-        <RoundReviewPanel
-          entries={PLAYERS}
-          guesses={guesses}
-          unlockedCount={unlockedCount}
-          renderDrawing={renderRoundDrawing}
-        />
+        <RoundReviewPanel entries={PLAYERS} unlockedCount={unlockedCount} renderDrawing={renderRoundDrawing} />
         <Link
           href="/"
           className="flex h-11 items-center justify-center rounded-full bg-zinc-900 px-6 text-sm font-medium text-white active:scale-95"
@@ -213,12 +192,7 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
         className="flex flex-none flex-col items-center gap-1.5 px-3 pb-1.5"
         style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
       >
-        <RoundReviewPanel
-          entries={PLAYERS}
-          guesses={guesses}
-          unlockedCount={unlockedCount}
-          renderDrawing={renderRoundDrawing}
-        />
+        <RoundReviewPanel entries={PLAYERS} unlockedCount={unlockedCount} renderDrawing={renderRoundDrawing} />
         <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
           <span>
             第 {roundIndex + 1} / {TOTAL_ROUNDS} 轮

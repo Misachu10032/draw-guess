@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { NormalizedPoint, StrokeSegment } from "@/lib/room";
 
@@ -18,6 +19,11 @@ const THICKNESSES = [
 
 // How often in-progress stroke points are flushed to the network.
 const FLUSH_INTERVAL_MS = 600;
+
+// Kept in one place so it always matches DrawingBoard.tsx's court image styling.
+const COURT_SCALE = 1.15;
+const COURT_TRANSLATE_X_PCT = -5;
+const COURT_TRANSLATE_Y_PCT = 4;
 
 type Point = { x: number; y: number };
 
@@ -47,6 +53,7 @@ export default function LiveDrawCanvas({ onSegment, onClear }: LiveDrawCanvasPro
   const [color, setColor] = useState<string>(COLORS[0].value);
   const [lineWidth, setLineWidth] = useState<number>(THICKNESSES[1].value);
   const [tool, setTool] = useState<"draw" | "erase">("draw");
+  const [showCourt, setShowCourt] = useState<boolean>(true);
 
   const colorRef = useRef(color);
   const lineWidthRef = useRef(lineWidth);
@@ -280,16 +287,33 @@ export default function LiveDrawCanvas({ onSegment, onClear }: LiveDrawCanvasPro
 
           <div className="h-px w-full bg-zinc-200" />
 
-          <button
-            type="button"
-            aria-label="Clear canvas"
-            onClick={handleClear}
-            className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white active:scale-95"
-          >
-            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-              <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
+          <div className="flex gap-1.5">
+            <button
+              type="button"
+              aria-label="Clear canvas"
+              onClick={handleClear}
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white active:scale-95"
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+            </button>
+
+            <button
+              type="button"
+              aria-label="Toggle court background"
+              aria-pressed={showCourt}
+              onClick={() => setShowCourt((v) => !v)}
+              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors active:scale-95 ${
+                showCourt ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-700"
+              }`}
+            >
+              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
+                <rect x="4" y="3" width="16" height="18" rx="1" strokeLinejoin="round" />
+                <path d="M4 9h16M4 15h16M12 3v18" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -298,7 +322,18 @@ export default function LiveDrawCanvas({ onSegment, onClear }: LiveDrawCanvasPro
           className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
           style={{ width: "100%", height: "100%" }}
         >
-          <div ref={containerRef} className="h-full w-full touch-none">
+          {showCourt && (
+            <Image
+              src="/court/court.webp"
+              alt=""
+              fill
+              priority
+              draggable={false}
+              className="pointer-events-none select-none object-cover"
+              style={{ transform: `scale(${COURT_SCALE}) translate(${COURT_TRANSLATE_X_PCT}%, ${COURT_TRANSLATE_Y_PCT}%)` }}
+            />
+          )}
+          <div ref={containerRef} className="relative z-10 h-full w-full touch-none">
             <canvas
               ref={canvasRef}
               className="block h-full w-full touch-none"

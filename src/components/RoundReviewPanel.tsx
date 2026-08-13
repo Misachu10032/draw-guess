@@ -6,12 +6,7 @@ import type { Player } from "@/lib/players";
 
 type RoundReviewPanelProps = {
   entries: readonly Player[];
-  /** The guess the user typed for each round (by index), shown on the "画"
-   *  button instead of the real player name. */
-  guesses: readonly (string | null)[];
-  /** How many entries (from the start) have their round's guess confirmed —
-   *  both the drawn picture and the real photo unlock together, so neither
-   *  row gives away a round's name before it's been guessed. */
+  /** How many rounds (from the start) are fully over and available to review. */
   unlockedCount: number;
   /** Overrides the "画" row's full-screen preview for a given round index —
    *  e.g. replaying the actual live-drawn strokes in multiplayer, instead of
@@ -21,7 +16,7 @@ type RoundReviewPanelProps = {
 
 type ModalContent = { kind: "image"; src: string; alt: string } | { kind: "custom"; node: ReactNode };
 
-export default function RoundReviewPanel({ entries, guesses, unlockedCount, renderDrawing }: RoundReviewPanelProps) {
+export default function RoundReviewPanel({ entries, unlockedCount, renderDrawing }: RoundReviewPanelProps) {
   const [modal, setModal] = useState<ModalContent | null>(null);
 
   return (
@@ -31,7 +26,6 @@ export default function RoundReviewPanel({ entries, guesses, unlockedCount, rend
           label="画"
           entries={entries}
           unlockedCount={unlockedCount}
-          getDisplayName={(entry, i) => guesses[i] ?? entry.name}
           onSelect={(entry, i) =>
             setModal(
               renderDrawing
@@ -44,7 +38,6 @@ export default function RoundReviewPanel({ entries, guesses, unlockedCount, rend
           label="真人照片"
           entries={entries}
           unlockedCount={unlockedCount}
-          getDisplayName={(entry) => entry.name}
           onSelect={(entry) => setModal({ kind: "image", src: entry.photoSrc, alt: entry.name })}
         />
       </div>
@@ -82,11 +75,10 @@ type ReviewRowProps = {
   label: string;
   entries: readonly Player[];
   unlockedCount: number;
-  getDisplayName: (entry: Player, index: number) => string;
   onSelect: (entry: Player, index: number) => void;
 };
 
-function ReviewRow({ label, entries, unlockedCount, getDisplayName, onSelect }: ReviewRowProps) {
+function ReviewRow({ label, entries, unlockedCount, onSelect }: ReviewRowProps) {
   return (
     <div className="flex items-center gap-1.5">
       <span className="w-12 shrink-0 text-[10px] font-medium text-zinc-400">{label}</span>
@@ -98,14 +90,14 @@ function ReviewRow({ label, entries, unlockedCount, getDisplayName, onSelect }: 
               key={entry.id}
               type="button"
               disabled={!unlocked}
-              aria-label={unlocked ? `${label} ${getDisplayName(entry, i)}` : `${label} 未解锁`}
+              aria-label={unlocked ? `${label} 第 ${i + 1} 轮` : `${label} 未解锁`}
               onClick={() => onSelect(entry, i)}
-              className={`flex h-6 items-center justify-center overflow-hidden rounded-full border px-0.5 text-[10px] font-medium transition-colors active:scale-95 ${
+              className={`flex h-6 items-center justify-center overflow-hidden rounded-full border text-[10px] font-medium transition-colors active:scale-95 ${
                 unlocked ? "border-zinc-300 bg-white text-zinc-700" : "border-zinc-200 bg-zinc-100 text-zinc-300"
               }`}
             >
               {unlocked ? (
-                <span className="truncate">{getDisplayName(entry, i)}</span>
+                <span>{i + 1}</span>
               ) : (
                 <svg viewBox="0 0 24 24" className="h-2.5 w-2.5" fill="none" stroke="currentColor" strokeWidth={2.5}>
                   <rect x="5" y="11" width="14" height="9" rx="1.5" />
