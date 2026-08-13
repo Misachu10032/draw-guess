@@ -1,10 +1,19 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { sanitizeRoomCode } from "@/lib/room";
 
 export default function LandingPage() {
+  const router = useRouter();
   const [roomCode, setRoomCode] = useState("");
+  const sanitized = sanitizeRoomCode(roomCode);
+
+  const handleJoin = () => {
+    if (!sanitized) return;
+    router.push(`/room/${sanitized}`);
+  };
 
   return (
     <div
@@ -33,15 +42,19 @@ export default function LandingPage() {
         <div className="flex gap-2">
           <input
             type="text"
-            inputMode="numeric"
             value={roomCode}
             onChange={(e) => setRoomCode(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleJoin();
+            }}
             placeholder="房间号"
             className="h-12 min-w-0 flex-1 rounded-full border-2 border-zinc-300 bg-white px-4 text-base text-zinc-900 placeholder:text-zinc-400 focus:border-zinc-900 focus:outline-none"
           />
           <button
             type="button"
-            className="h-12 shrink-0 rounded-full border-2 border-zinc-300 bg-white px-5 text-base font-medium text-zinc-700 active:scale-95"
+            onClick={handleJoin}
+            disabled={!sanitized}
+            className="h-12 shrink-0 rounded-full border-2 border-zinc-300 bg-white px-5 text-base font-medium text-zinc-700 active:scale-95 disabled:opacity-40"
           >
             加入
           </button>
