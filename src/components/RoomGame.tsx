@@ -14,9 +14,10 @@ import {
   type RoomEvent,
   type StrokeSegment,
 } from "@/lib/room";
-import LiveDrawCanvas from "@/components/LiveDrawCanvas";
+import LiveDrawCanvas, { type LiveDrawCanvasHandle } from "@/components/LiveDrawCanvas";
 import LiveDrawViewer from "@/components/LiveDrawViewer";
 import RoundReviewPanel from "@/components/RoundReviewPanel";
+import DrawToolbar, { TOOLBAR_COLORS, TOOLBAR_THICKNESSES } from "@/components/DrawToolbar";
 
 const TOTAL_ROUNDS = PLAYERS.length;
 
@@ -42,10 +43,17 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
   const [guessDraft, setGuessDraft] = useState("");
   const [viewMode, setViewMode] = useState<"drawing" | "photo">("drawing");
   // Mirrors the drawer's court toggle for the guesser's view — defaults to
-  // true each round, matching LiveDrawCanvas's own per-round default.
+  // true each round, matching the toolbar's own per-round default.
   const [courtVisible, setCourtVisible] = useState(true);
+  // Drawing tool state lives here (not inside LiveDrawCanvas) so the toolbar
+  // can be rendered next to the round review panel instead of inside the
+  // canvas component itself.
+  const [color, setColor] = useState<string>(TOOLBAR_COLORS[0].value);
+  const [lineWidth, setLineWidth] = useState<number>(TOOLBAR_THICKNESSES[1].value);
+  const [tool, setTool] = useState<"draw" | "erase">("draw");
 
   const channelRef = useRef<PresenceChannel | null>(null);
+  const canvasHandleRef = useRef<LiveDrawCanvasHandle | null>(null);
 
   useEffect(() => {
     let pusher: PusherType | null = null;
@@ -146,6 +154,19 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
     sendRoomEvent({ type: "round-advance", roundIndex: roundIndex + 1 });
   };
 
+  const handleToggleCourt = () => {
+    setCourtVisible((v) => {
+      const next = !v;
+      sendRoomEvent({ type: "court-toggle", visible: next });
+      return next;
+    });
+  };
+
+  const handleClearCanvas = () => {
+    canvasHandleRef.current?.clear();
+    sendRoomEvent({ type: "clear-canvas", roundIndex });
+  };
+
   const handleSendGuess = () => {
     const text = guessDraft.trim();
     if (!text) return;
@@ -195,11 +216,28 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
   return (
     <div className="flex h-full w-full flex-col bg-zinc-50">
       <div
-        className="flex flex-none flex-col items-center gap-1.5 px-3 pb-1.5"
+        className="flex flex-none flex-col gap-1.5 px-3 pb-1.5"
         style={{ paddingTop: "max(0.5rem, env(safe-area-inset-top))" }}
       >
-        <RoundReviewPanel entries={PLAYERS} unlockedCount={unlockedCount} renderDrawing={renderRoundDrawing} />
-        <div className="flex items-center gap-2 text-xs font-medium text-zinc-400">
+        <div className="flex items-start justify-center gap-2">
+          <div className="min-w-0 flex-1">
+            <RoundReviewPanel entries={PLAYERS} unlockedCount={unlockedCount} renderDrawing={renderRoundDrawing} />
+          </div>
+          {amIDrawer && (
+            <DrawToolbar
+              color={color}
+              onColorChange={setColor}
+              lineWidth={lineWidth}
+              onLineWidthChange={setLineWidth}
+              tool={tool}
+              onToolChange={setTool}
+              showCourt={courtVisible}
+              onToggleCourt={handleToggleCourt}
+              onClear={handleClearCanvas}
+            />
+          )}
+        </div>
+        <div className="flex items-center justify-center gap-2 text-xs font-medium text-zinc-400">
           <span>
             第 {roundIndex + 1} / {TOTAL_ROUNDS} 轮
           </span>
@@ -215,9 +253,12 @@ export default function RoomGame({ roomCode }: RoomGameProps) {
             player={player}
             chatMessages={chatMessages}
             isLastRound={isLastRound}
+            color={color}
+            lineWidth={lineWidth}
+            tool={tool}
+            showCourt={courtVisible}
+            canvasRef={canvasHandleRef}
             onSegment={(segment) => sendRoomEvent({ type: "stroke-batch", roundIndex, segment })}
-            onClear={() => sendRoomEvent({ type: "clear-canvas", roundIndex })}
-            onCourtToggle={(visible) => sendRoomEvent({ type: "court-toggle", visible })}
             onAdvance={handleAdvance}
           />
         ) : (
@@ -293,26 +334,37 @@ function DrawerView({
   player,
   chatMessages,
   isLastRound,
+  color,
+  lineWidth,
+  tool,
+  showCourt,
+  canvasRef,
   onSegment,
-  onClear,
-  onCourtToggle,
   onAdvance,
 }: {
   player: (typeof PLAYERS)[number];
   chatMessages: ChatMessage[];
   isLastRound: boolean;
+  color: string;
+  lineWidth: number;
+  tool: "draw" | "erase";
+  showCourt: boolean;
+  canvasRef: React.RefObject<LiveDrawCanvasHandle | null>;
   onSegment: (segment: StrokeSegment) => void;
-  onClear: () => void;
-  onCourtToggle: (visible: boolean) => void;
   onAdvance: () => void;
 }) {
   const [showPhoto, setShowPhoto] = useState(false);
 
   return (
     <div className="relative flex h-full w-full flex-col">
-      <div className="min-h-0 flex-1">
-        <LiveDrawCanvas onSegment={onSegment} onClear={onClear} onCourtToggle={onCourtToggle} />
-      </div>
+      <LiveDrawCanvas
+        ref={canvasRef}
+        color={color}
+        lineWidth={lineWidth}
+        tool={tool}
+        showCourt={showCourt}
+        onSegment={onSegment}
+      />
 
       <button
         type="button"

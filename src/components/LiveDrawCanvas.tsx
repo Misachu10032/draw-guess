@@ -1,21 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from "react";
 import type { NormalizedPoint, StrokeSegment } from "@/lib/room";
-
-const COLORS = [
-  { name: "Black", value: "#000000" },
-  { name: "Red", value: "#ef4444" },
-  { name: "Blue", value: "#3b82f6" },
-] as const;
-
-const THICKNESSES = [
-  { name: "Thin", value: 3 },
-  { name: "Medium", value: 8 },
-  { name: "Thick", value: 16 },
-  { name: "Extra thick", value: 28 },
-] as const;
 
 // How often in-progress stroke points are flushed to the network.
 const FLUSH_INTERVAL_MS = 600;
@@ -27,19 +14,27 @@ const COURT_TRANSLATE_Y_PCT = 4;
 
 type Point = { x: number; y: number };
 
+export type LiveDrawCanvasHandle = {
+  /** Wipes the canvas bitmap. Doesn't broadcast anything — the caller (which
+   *  owns the "clear" button) is responsible for sending the network event. */
+  clear: () => void;
+};
+
 type LiveDrawCanvasProps = {
+  color: string;
+  lineWidth: number;
+  tool: "draw" | "erase";
+  showCourt: boolean;
   /** Called with a batch of normalized points whenever they should be sent
    *  over the network — roughly every FLUSH_INTERVAL_MS while drawing, plus
    *  immediately when a stroke ends. */
   onSegment: (segment: StrokeSegment) => void;
-  /** Called when the drawer clears the canvas, so the viewer can clear too. */
-  onClear: () => void;
-  /** Called when the drawer toggles the court background, so the viewer's
-   *  copy stays in sync. */
-  onCourtToggle?: (visible: boolean) => void;
 };
 
-export default function LiveDrawCanvas({ onSegment, onClear, onCourtToggle }: LiveDrawCanvasProps) {
+const LiveDrawCanvas = forwardRef<LiveDrawCanvasHandle, LiveDrawCanvasProps>(function LiveDrawCanvas(
+  { color, lineWidth, tool, showCourt, onSegment },
+  ref
+) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
@@ -52,11 +47,6 @@ export default function LiveDrawCanvas({ onSegment, onClear, onCourtToggle }: Li
   const pendingPointsRef = useRef<NormalizedPoint[]>([]);
   const strokeMetaRef = useRef<{ color: string; width: number; tool: "draw" | "erase" } | null>(null);
   const hasNewPointsRef = useRef(false);
-
-  const [color, setColor] = useState<string>(COLORS[0].value);
-  const [lineWidth, setLineWidth] = useState<number>(THICKNESSES[1].value);
-  const [tool, setTool] = useState<"draw" | "erase">("draw");
-  const [showCourt, setShowCourt] = useState<boolean>(true);
 
   const colorRef = useRef(color);
   const lineWidthRef = useRef(lineWidth);
@@ -215,146 +205,46 @@ export default function LiveDrawCanvas({ onSegment, onClear, onCourtToggle }: Li
     hasNewPointsRef.current = false;
   };
 
-  const handleClear = () => {
-    const canvas = canvasRef.current;
-    const ctx = ctxRef.current;
-    if (!canvas || !ctx) return;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    onClear();
-  };
+  useImperativeHandle(ref, () => ({
+    clear: () => {
+      const canvas = canvasRef.current;
+      const ctx = ctxRef.current;
+      if (!canvas || !ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    },
+  }));
 
   return (
-    <div className="flex h-full w-full flex-col">
-      <div className="flex flex-none items-start justify-end p-2">
-        <div className="flex flex-col items-center gap-1.5 rounded-2xl border border-zinc-200 bg-white/95 p-1.5 shadow-lg backdrop-blur">
-          <div className="flex gap-1.5">
-            {COLORS.map((c) => (
-              <button
-                key={c.value}
-                type="button"
-                aria-label={c.name}
-                aria-pressed={tool === "draw" && color === c.value}
-                onClick={() => {
-                  setColor(c.value);
-                  setTool("draw");
-                }}
-                className={`h-7 w-7 rounded-full border-2 transition-transform active:scale-95 ${
-                  tool === "draw" && color === c.value ? "border-zinc-900 scale-110" : "border-zinc-300"
-                }`}
-                style={{ backgroundColor: c.value }}
-              />
-            ))}
-            <button
-              type="button"
-              aria-label="Eraser"
-              aria-pressed={tool === "erase"}
-              onClick={() => setTool("erase")}
-              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors active:scale-95 ${
-                tool === "erase" ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-700"
-              }`}
-            >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path
-                  d="M18 13l-7 7H6l-3-3a1.5 1.5 0 0 1 0-2l10-10a1.5 1.5 0 0 1 2 0l4 4a1.5 1.5 0 0 1 0 2l-2 2z"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path d="M9.5 20H20" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="h-px w-full bg-zinc-200" />
-
-          <div className="flex gap-1.5">
-            {THICKNESSES.map((t) => (
-              <button
-                key={t.value}
-                type="button"
-                aria-label={t.name}
-                aria-pressed={lineWidth === t.value}
-                onClick={() => setLineWidth(t.value)}
-                className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors active:scale-95 ${
-                  lineWidth === t.value
-                    ? "border-zinc-900 bg-zinc-900 text-white"
-                    : "border-zinc-300 bg-white text-zinc-700"
-                }`}
-              >
-                <span
-                  className="rounded-full bg-current"
-                  style={{ width: Math.min(t.value, 18), height: Math.min(t.value, 18) }}
-                />
-              </button>
-            ))}
-          </div>
-
-          <div className="h-px w-full bg-zinc-200" />
-
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              aria-label="Clear canvas"
-              onClick={handleClear}
-              className="flex h-7 w-7 items-center justify-center rounded-full bg-zinc-900 text-white active:scale-95"
-            >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path d="M4 7h16M9 7V4h6v3M7 7l1 13h8l1-13" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-
-            <button
-              type="button"
-              aria-label="Toggle court background"
-              aria-pressed={showCourt}
-              onClick={() =>
-                setShowCourt((v) => {
-                  const next = !v;
-                  onCourtToggle?.(next);
-                  return next;
-                })
-              }
-              className={`flex h-7 w-7 items-center justify-center rounded-full border-2 transition-colors active:scale-95 ${
-                showCourt ? "border-zinc-900 bg-zinc-900 text-white" : "border-zinc-300 bg-white text-zinc-700"
-              }`}
-            >
-              <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2}>
-                <rect x="4" y="3" width="16" height="18" rx="1" strokeLinejoin="round" />
-                <path d="M4 9h16M4 15h16M12 3v18" strokeLinecap="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="flex flex-1 items-start justify-center overflow-hidden px-2 pb-2">
-        <div
-          className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
-          style={{ width: "100%", height: "100%" }}
-        >
-          {showCourt && (
-            <Image
-              src="/court/court.webp"
-              alt=""
-              fill
-              priority
-              draggable={false}
-              className="pointer-events-none select-none object-cover"
-              style={{ transform: `scale(${COURT_SCALE}) translate(${COURT_TRANSLATE_X_PCT}%, ${COURT_TRANSLATE_Y_PCT}%)` }}
-            />
-          )}
-          <div ref={containerRef} className="relative z-10 h-full w-full touch-none">
-            <canvas
-              ref={canvasRef}
-              className="block h-full w-full touch-none"
-              onPointerDown={handlePointerDown}
-              onPointerMove={handlePointerMove}
-              onPointerUp={endStroke}
-              onPointerLeave={endStroke}
-              onPointerCancel={endStroke}
-            />
-          </div>
+    <div className="flex min-h-0 flex-1 items-start justify-center overflow-hidden px-2 pb-2">
+      <div
+        className="relative overflow-hidden rounded-2xl border border-zinc-200 bg-white shadow-sm"
+        style={{ width: "100%", height: "100%" }}
+      >
+        {showCourt && (
+          <Image
+            src="/court/court.webp"
+            alt=""
+            fill
+            priority
+            draggable={false}
+            className="pointer-events-none select-none object-cover"
+            style={{ transform: `scale(${COURT_SCALE}) translate(${COURT_TRANSLATE_X_PCT}%, ${COURT_TRANSLATE_Y_PCT}%)` }}
+          />
+        )}
+        <div ref={containerRef} className="relative z-10 h-full w-full touch-none">
+          <canvas
+            ref={canvasRef}
+            className="block h-full w-full touch-none"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={endStroke}
+            onPointerLeave={endStroke}
+            onPointerCancel={endStroke}
+          />
         </div>
       </div>
     </div>
   );
-}
+});
+
+export default LiveDrawCanvas;
